@@ -2,13 +2,15 @@ program DelphiModelGenerator;
 
 uses
   Vcl.Forms,
-  U_Main in 'U_Main.pas' {Form1};
+  U_Main in 'U_Main.pas' {F_Main},
+  Vcl.Themes,
+  Vcl.Styles;
 
 {$R *.res}
 
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TF_Main, F_Main);
   Application.Run;
 end.
