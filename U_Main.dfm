@@ -2,8 +2,8 @@ object F_Main: TF_Main
   Left = 0
   Top = 0
   BorderIcons = [biSystemMenu, biMinimize]
-  ClientHeight = 421
-  ClientWidth = 1084
+  ClientHeight = 359
+  ClientWidth = 1055
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,42 +17,49 @@ object F_Main: TF_Main
   object pnlBody: TPanel
     Left = 0
     Top = 0
-    Width = 1084
-    Height = 421
+    Width = 1055
+    Height = 359
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitWidth = 966
+    ExplicitWidth = 1084
+    ExplicitHeight = 421
     object pnl1: TPanel
       Left = 0
       Top = 0
       Width = 321
-      Height = 421
+      Height = 359
       Align = alLeft
-      Caption = 'pnl1'
+      BevelOuter = bvNone
       TabOrder = 0
+      ExplicitHeight = 421
       object pgc1: TPageControl
         AlignWithMargins = True
-        Left = 4
-        Top = 4
-        Width = 313
-        Height = 413
+        Left = 3
+        Top = 3
+        Width = 315
+        Height = 353
         ActivePage = tsSettings
         Align = alClient
         TabOrder = 0
-        ExplicitWidth = 297
+        ExplicitLeft = 4
+        ExplicitTop = 4
+        ExplicitWidth = 313
+        ExplicitHeight = 413
         object tsSettings: TTabSheet
           Caption = 'Settings'
+          ExplicitWidth = 305
+          ExplicitHeight = 383
           object grp1: TGroupBox
             AlignWithMargins = True
             Left = 3
             Top = 3
-            Width = 299
+            Width = 301
             Height = 230
             Align = alTop
             Caption = ' DataBase '
             TabOrder = 0
-            ExplicitWidth = 283
+            ExplicitWidth = 299
             object lbl2: TLabel
               Left = 11
               Top = 20
@@ -183,12 +190,12 @@ object F_Main: TF_Main
             AlignWithMargins = True
             Left = 3
             Top = 239
-            Width = 299
+            Width = 301
             Height = 82
             Align = alTop
             Caption = ' General '
             TabOrder = 1
-            ExplicitWidth = 283
+            ExplicitWidth = 299
             object lbl8: TLabel
               Left = 11
               Top = 50
@@ -236,21 +243,24 @@ object F_Main: TF_Main
     object pnl2: TPanel
       Left = 321
       Top = 0
-      Width = 763
-      Height = 421
+      Width = 734
+      Height = 359
       Align = alClient
+      BevelOuter = bvNone
       TabOrder = 1
-      ExplicitLeft = 305
-      ExplicitWidth = 661
+      ExplicitWidth = 763
+      ExplicitHeight = 421
       object pnl3: TPanel
-        Left = 1
-        Top = 1
-        Width = 761
+        Left = 0
+        Top = 0
+        Width = 734
         Height = 29
         Align = alTop
         BevelOuter = bvNone
         TabOrder = 0
-        ExplicitWidth = 659
+        ExplicitLeft = 1
+        ExplicitTop = 1
+        ExplicitWidth = 761
         object lbl1: TLabel
           AlignWithMargins = True
           Left = 3
@@ -264,7 +274,7 @@ object F_Main: TF_Main
         end
         object btn1: TButton
           AlignWithMargins = True
-          Left = 684
+          Left = 657
           Top = 1
           Width = 75
           Height = 27
@@ -276,22 +286,22 @@ object F_Main: TF_Main
           Caption = 'Generate'
           TabOrder = 0
           OnClick = btn1Click
-          ExplicitLeft = 582
+          ExplicitLeft = 684
         end
         object cbbTables: TComboBox
           AlignWithMargins = True
           Left = 80
           Top = 3
-          Width = 443
+          Width = 416
           Height = 23
           Align = alClient
           TabOrder = 1
           OnChange = cbbTablesChange
-          ExplicitWidth = 462
+          ExplicitWidth = 443
         end
         object chkGenAllTables: TCheckBox
           AlignWithMargins = True
-          Left = 529
+          Left = 502
           Top = 3
           Width = 150
           Height = 23
@@ -299,19 +309,17 @@ object F_Main: TF_Main
           Caption = 'Generate for all tables'
           TabOrder = 2
           OnClick = chkGenAllTablesClick
-          ExplicitLeft = 551
-          ExplicitTop = 0
-          ExplicitHeight = 29
+          ExplicitLeft = 529
         end
       end
       object dbgrd1: TDBGrid
         AlignWithMargins = True
-        Left = 4
-        Top = 33
-        Width = 755
-        Height = 384
+        Left = 3
+        Top = 32
+        Width = 728
+        Height = 303
         Align = alClient
-        DataSource = dsGrid
+        DataSource = dsFields
         TabOrder = 1
         TitleFont.Charset = DEFAULT_CHARSET
         TitleFont.Color = clWindowText
@@ -324,7 +332,7 @@ object F_Main: TF_Main
             FieldName = 'FIELD_NAME'
             Title.Alignment = taCenter
             Title.Caption = 'Name'
-            Width = 200
+            Width = 180
             Visible = True
           end
           item
@@ -368,6 +376,29 @@ object F_Main: TF_Main
             Visible = True
           end>
       end
+      object pnl4: TPanel
+        Left = 0
+        Top = 338
+        Width = 734
+        Height = 21
+        Align = alBottom
+        BevelOuter = bvNone
+        TabOrder = 2
+        Visible = False
+        ExplicitTop = 369
+        ExplicitWidth = 763
+        object pbGenProcess: TProgressBar
+          AlignWithMargins = True
+          Left = 3
+          Top = 3
+          Width = 728
+          Height = 15
+          Align = alClient
+          TabOrder = 0
+          ExplicitLeft = 28
+          ExplicitWidth = 525
+        end
+      end
     end
   end
   object FDCon1: TFDConnection
@@ -386,10 +417,15 @@ object F_Main: TF_Main
     SQL.Strings = (
       'select rts.rdb$relation_name as rts_table_name'
       'from rdb$relations rts'
-      'where rts.rdb$system_flag = 0 and'
-      '      rts.rdb$relation_type = 0')
+      'where rts.rdb$system_flag = 0 ')
     Left = 480
     Top = 216
+    object qryTablesRTS_TABLE_NAME: TWideStringField
+      FieldName = 'RTS_TABLE_NAME'
+      Origin = 'RDB$RELATION_NAME'
+      FixedChar = True
+      Size = 31
+    end
   end
   object qryFieldsRelation: TFDQuery
     Connection = FDCon1
@@ -517,9 +553,9 @@ object F_Main: TF_Main
       Size = 31
     end
   end
-  object dsGrid: TDataSource
+  object dsFields: TDataSource
     DataSet = qryFieldsRelation
-    Left = 560
-    Top = 272
+    Left = 544
+    Top = 240
   end
 end

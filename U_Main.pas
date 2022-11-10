@@ -10,7 +10,8 @@ uses
   FireDAC.Phys, FireDAC.VCLUI.Wait, Data.DB, FireDAC.Comp.Client, Vcl.Grids,
   Vcl.DBGrids, FireDAC.Stan.Util, FireDAC.Phys.FB, FireDAC.Phys.FBDef, System.StrUtils,
   IniFiles, FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
-  FireDAC.Comp.DataSet, FileCtrl;
+  FireDAC.Comp.DataSet, FileCtrl, System.Types, Vcl.Mask, Vcl.DBCtrls, System.Diagnostics,
+  System.TimeSpan;
 
 type
   TF_Main = class(TForm)
@@ -47,7 +48,7 @@ type
     FDCon1: TFDConnection;
     qryTables: TFDQuery;
     qryFieldsRelation: TFDQuery;
-    dsGrid: TDataSource;
+    dsFields: TDataSource;
     btnConect: TButton;
     qryFieldsRelationTABLE_NAME: TWideStringField;
     qryFieldsRelationFIELD_NAME: TWideStringField;
@@ -59,6 +60,9 @@ type
     chkGenAllTables: TCheckBox;
     cbbClassType: TComboBox;
     Label1: TLabel;
+    pnl4: TPanel;
+    pbGenProcess: TProgressBar;
+    qryTablesRTS_TABLE_NAME: TWideStringField;
     procedure btnTestConClick(Sender: TObject);
     procedure FDCon1BeforeConnect(Sender: TObject);
     procedure btnLoadDBClick(Sender: TObject);
@@ -72,8 +76,9 @@ type
     { Private declarations }
     procedure SetParams(DriverId, Server, Port, Database, Username, Password: String);
     procedure LoadData;
-    procedure GenPasFile(typeClass: Integer);
-
+    procedure GenPasFile(typeClass: Integer; sTableName: string);
+    function FirstCharUpperCasse(str: string): string;
+    function GetFieldType(fieldType: string): string;
   public
     { Public declarations }
   end;
@@ -86,7 +91,17 @@ implementation
 {$R *.dfm}
 
 procedure TF_Main.btn1Click(Sender: TObject);
+var
+  Stopwatch: TStopwatch;
+  Elapsed: TTimeSpan;
+  Seconds: Double;
 begin
+  if not (FDCon1.Connected) then
+  begin
+    ShowMessage('Connection falied');
+    Abort;
+  end;
+
   if (cbbClassType.Text = '') then
   begin
     ShowMessage('Choose a method of generate.');
@@ -99,6 +114,31 @@ begin
     Abort;
   end;
 
+  qryFieldsRelation.DisableControls;
+  if chkGenAllTables.Checked then
+  begin
+    qryTables.First;
+
+    pbGenProcess.Position := 0;
+    pbGenProcess.Max      := qryTables.RecordCount;
+    pnl4.Visible := True;
+
+    Stopwatch := TStopwatch.StartNew;
+    while not qryTables.Eof do
+    begin
+      GenPasFile(cbbClassType.ItemIndex,
+        FirstCharUpperCasse(qryTables.FieldByName('rts_table_name').AsString));
+      qryTables.Next;
+      pbGenProcess.Position := pbGenProcess.Position + 1;
+    end;
+    Elapsed := Stopwatch.Elapsed;
+    Seconds := Elapsed.TotalSeconds;
+    ShowMessage(Format('Generating %s pas files in %n seconds.',
+        [IntToStr(qryTables.RecordCount),  Seconds]));
+  end
+  else
+    GenPasFile(cbbClassType.ItemIndex, FirstCharUpperCasse(cbbTables.Text));
+  qryFieldsRelation.EnableControls;
 end;
 
 procedure TF_Main.btnConectClick(Sender: TObject);
@@ -201,9 +241,156 @@ begin
             edtDataBase.Text, edtUserName.Text, edtPassword.Text);
 end;
 
-procedure TF_Main.GenPasFile(typeClass: Integer);
+function TF_Main.FirstCharUpperCasse(str: string): string;
+var
+  field_names: TStringDynArray;
+  i: Integer;
+  strAux:string;
 begin
-  //
+  if ((str <> '') and (ContainsStr(str, '_'))) then
+  begin
+    field_names := SplitString(str, '_');
+    for i := 0 to Length(field_names) - 1 do
+    begin
+      strAux := strAux + UpperCase(Copy(field_names[i], 1, 1)) +
+                         LowerCase(Copy(field_names[i], 2, Length(field_names[i])));
+    end;
+    Result := strAux;
+  end
+  else
+    Result := UpperCase(Copy(str,1,1)) + LowerCase(Copy(str,2,Length(str)));
+end;
+
+procedure TF_Main.GenPasFile(typeClass: Integer; sTableName: string);
+var
+  pasEditor: TMemo;
+  sOldFilter, sTColumnLine, sPropertyLine,
+  sFieldName, sSaveDir, sIsPk_Fk: String;
+begin
+  sTColumnLine  := '    [TColumn(''%s'', ''%s'', %d, %s)]';
+  sPropertyLine := '    property %s: %s read F%s write F%s;';
+
+  pasEditor := TMemo.Create(nil);
+  pasEditor.Parent := Application.MainForm;
+  pasEditor.Visible := False;
+
+  qryFieldsRelation.Close;
+  qryFieldsRelation.ParamByName('table_name').AsString :=
+    qryTables.FieldByName('rts_table_name').AsString;
+  qryFieldsRelation.Open;
+
+  if typeClass = 1 then
+  begin
+    pasEditor.Lines.Add(Format('unit Model.%s;' + #13#10, [sTableName]));
+    pasEditor.Lines.Add('interface' + #13#10 + #13#10 + 'uses ORM;' + #13#10 + #13#10 + 'type');
+    pasEditor.Lines.Add(Format('  [TTable(''%s'')]', [sTableName]));
+
+    sOldFilter := qryTables.Filter;
+    qryFieldsRelation.Filtered := True;
+    qryFieldsRelation.Filter   := ' FIELD_IS_PK = ''Yes''';
+
+    if qryFieldsRelation.RecordCount >= 1 then
+    begin
+      qryFieldsRelation.First;
+      while not qryFieldsRelation.Eof do
+      begin
+        pasEditor.Lines.Add(Format('  [TPrimaryKey(''%s'', ''%s'', ''%d'', True)]',
+          [LowerCase(qryFieldsRelation.FieldByName('field_name').AsString),
+           LowerCase(qryFieldsRelation.FieldByName('field_type').AsString),
+           qryFieldsRelation.FieldByName('field_length').AsInteger]));
+
+        qryFieldsRelation.Next;
+      end;
+    end;
+
+    qryFieldsRelation.Filter := sOldFilter;
+    pasEditor.Lines.Add(Format('  T%s = class(TORMObject<T%s>', [sTableName, sTableName]));
+  end
+  else
+  begin
+    pasEditor.Lines.Add(Format('unit %s;' + #13#10, [sTableName]));
+    pasEditor.Lines.Add('interface' + #13#10 + #13#10 + 'type');
+    pasEditor.Lines.Add(Format('  T%s = class', [sTableName]))
+  end;
+
+  pasEditor.Lines.Add('  private' + #13#10 + '    { Private Declarations }');
+
+  qryFieldsRelation.First;
+  while not qryFieldsRelation.Eof do
+  begin
+    if qryFieldsRelation.FieldByName('field_is_fk').AsString = 'Yes' then
+    begin
+      pasEditor.Lines.Add(Format('    F%s: %s;',
+        [FirstCharUpperCasse(qryFieldsRelation.FieldByName('field_name').AsString),
+         'T' + FirstCharUpperCasse(qryFieldsRelation.FieldByName('references_table').AsString)]));
+    end
+    else
+    begin
+      pasEditor.Lines.Add(Format('    F%s: %s;',
+        [FirstCharUpperCasse(qryFieldsRelation.FieldByName('field_name').AsString),
+         GetFieldType(qryFieldsRelation.FieldByName('field_type').AsString)]));
+    end;
+    qryFieldsRelation.Next;
+  end;
+
+  pasEditor.Lines.Add('  public' + #13#10 + '    { Public Declarations }');
+
+  qryFieldsRelation.First;
+  while not qryFieldsRelation.Eof do
+  begin
+    sFieldName := FirstCharUpperCasse(qryFieldsRelation.FieldByName('field_name').AsString);
+
+    if typeClass = 1 then
+    begin
+      sIsPk_Fk := '';
+      if qryFieldsRelation.FieldByName('field_is_pk').AsString = 'Yes' then
+        sIsPk_Fk := 'True'
+      else if qryFieldsRelation.FieldByName('field_is_fk').AsString = 'Yes' then
+        sIsPk_Fk := 'True';
+
+      pasEditor.Lines.Add(Format(sTColumnLine,
+          [LowerCase(sFieldName),
+           LowerCase(GetFieldType(qryFieldsRelation.FieldByName('field_type').AsString)),
+           qryFieldsRelation.FieldByName('field_length').AsInteger, sIsPk_Fk]));
+
+      if sIsPk_Fk = '' then
+      begin
+        pasEditor.Lines[pasEditor.Lines.Count-1] :=
+            StringReplace(pasEditor.Lines[pasEditor.Lines.Count-1], ', )]', ')]', [rfReplaceAll]);
+      end;
+    end;
+
+    pasEditor.Lines.Add(Format(sPropertyLine,
+      [sFieldName, GetFieldType(qryFieldsRelation.FieldByName('field_type').AsString),
+       sFieldName, sFieldName]));
+    qryFieldsRelation.Next;
+  end;
+  pasEditor.Lines.Add('  end;' + #13#10);
+  pasEditor.Lines.Add(Format('implementation' + #13#10 + #13#10 + '{ T%s }' + #13#10, [sTableName]));
+  pasEditor.Lines.Add('end.');
+
+  if typeClass = 1 then
+    sSaveDir := Format('%s\%s.%s.pas', [edtDirSave.Text, 'Model', sTableName])
+  else
+    sSaveDir := Format('%s\%s.pas', [edtDirSave.Text, sTableName]);
+
+  pasEditor.Lines.SaveToFile(sSaveDir);
+end;
+
+function TF_Main.GetFieldType(fieldType: string): string;
+begin
+  FieldType := UpperCase(FieldType);
+
+  if MatchStr(FieldType, ['INTEGER','SMALLINT','BIGINT']) then
+    Result := 'Integer'
+  else if MatchStr(FieldType, ['FLOAT','DOUBLE PRECISION','NUMERIC','DECIMAL']) then
+    Result := 'Double'
+  else if MatchStr(FieldType, ['DATE','TIME','TIMESTAMP']) then
+    Result := 'TDateTime'
+  else if MatchStr(FieldType, ['CHAR','VARCHAR']) then
+    Result := 'String'
+  else if FieldType = 'BLOB' then
+    Result := 'BlobStream';
 end;
 
 procedure TF_Main.LoadData;
